@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toxic Comment Classification</title>
+    <style>
+        :root {
+            --primary: #4e54c8;
+            --primary-dark: #3a3f8e;
+            --secondary: #1e1e2f;
+            --danger: #e14668;
+            --success: #48c78e;
+            --warning: #ffe08a;
+            --info: #3e8ed0;
+            --neutral: #a9a9b3;
+            --light: #f8f9fa;
+            --dark: #121212;
+            --card-bg: #1e1e2f;
+            --text: #e4e4e4;
+            --text-muted: #a9a9b3;
+            --border: #34344a;
+            
+            /* New color variables for toxicity levels */
+            --low-toxic: #48c78e;
+            --mild-toxic: #ffe08a;
+            --medium-toxic: #ff922b;
+            --high-toxic: #e14668;
+            --extreme-toxic: #ff0000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #121212;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 800 800'%3E%3Cg fill='none' stroke='%23222' stroke-width='1'%3E%3Cpath d='M769 229L1037 260.9M927 880L731 737 520 660 309 538 40 599 295 764 126.5 879.5 40 599-197 493 102 382-31 229 126.5 79.5-69-63'/%3E%3Cpath d='M-31 229L237 261 390 382 603 493 308.5 537.5 101.5 381.5M370 905L295 764'/%3E%3Cpath d='M520 660L578 842 731 737 840 599 603 493 520 660 295 764 309 538 390 382 539 269 769 229 577.5 41.5 370 105 295 -36 126.5 79.5 237 261 102 382 40 599 -69 737 127 880'/%3E%3Cpath d='M520-140L578.5 42.5 731-63M603 493L539 269 237 261 370 105M902 382L539 269M390 382L102 382'/%3E%3Cpath d='M-222 42L126.5 79.5 370 105 539 269 577.5 41.5 927 80 769 229 902 382 603 493 731 737M295-36L577.5 41.5M578 842L295 764M40-201L127 80M102 382L-261 269'/%3E%3C/g%3E%3Cg fill='%23333'%3E%3Ccircle cx='769' cy='229' r='5'/%3E%3Ccircle cx='539' cy='269' r='5'/%3E%3Ccircle cx='603' cy='493' r='5'/%3E%3Ccircle cx='731' cy='737' r='5'/%3E%3Ccircle cx='520' cy='660' r='5'/%3E%3Ccircle cx='309' cy='538' r='5'/%3E%3Ccircle cx='295' cy='764' r='5'/%3E%3Ccircle cx='40' cy='599' r='5'/%3E%3Ccircle cx='102' cy='382' r='5'/%3E%3Ccircle cx='127' cy='80' r='5'/%3E%3Ccircle cx='370' cy='105' r='5'/%3E%3Ccircle cx='578' cy='42' r='5'/%3E%3Ccircle cx='237' cy='261' r='5'/%3E%3Ccircle cx='390' cy='382' r='5'/%3E%3C/g%3E%3C/svg%3E");
+            background-attachment: fixed;
+            color: var(--text);
+            line-height: 1.6;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            position: relative;
+            min-height: 100vh;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, rgba(18, 18, 18, 0.7), rgba(30, 30, 47, 0.7));
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+
+        .logo span {
+            color: var(--warning);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--danger));
+            z-index: 1;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.2s ease-in-out;
+            resize: none;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.25);
+        }
+
+        .btn {
+            cursor: pointer;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border: none;
+            border-radius: 4px;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 4px 15px rgba(78, 84, 200, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(90deg, var(--primary-dark), var(--primary));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(78, 84, 200, 0.4);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 15px rgba(78, 84, 200, 0.3);
+        }
+        
+        .btn-primary::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: rgba(255, 255, 255, 0.1);
+            transform: rotate(45deg);
+            transition: all 0.3s ease-in-out;
+            opacity: 0;
+            z-index: 1;
+        }
+        
+        .btn-primary:hover::after {
+            opacity: 1;
+            transform: rotate(45deg) translate(10%, 10%);
+        }
+
+        .result-card {
+            display: none;
+            margin-top: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .result-card.visible {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .result-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .result-icon {
+            width: 24px;
+            height: 24px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .result-content {
+            padding: 1.25rem;
+            background-color: rgba(18, 18, 18, 0.5);
+            border-radius: 4px;
+            border-left: 4px solid var(--primary);
+            position: relative;
+            overflow: hidden;
+            color: var(--text);
+        }
+        
+        .result-content::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 100px;
+            height: 100px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234e54c8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.08V12a10 10 0 1 1-5.93-9.14'%3E%3C/path%3E%3Cpolyline points='22 4 12 14.01 9 11.01'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.1;
+            z-index: 0;
+            transform: rotate(30deg);
+        }
+        
+        .result-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+            color: var(--text);
+        }
+
+        .result-icon {
+            width: 24px;
+            height: 24px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(78, 84, 200, 0.5);
+        }
+        
+        /* Enhanced toxicity meter styles */
+        .toxicity-meter {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: rgba(18, 18, 18, 0.5);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .meter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .meter-title {
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .toxicity-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-weight: bold;
+            font-size: 0.875rem;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .meter-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        
+        .meter-label span {
+            font-size: 0.875rem;
+            color: var(--text);
+        }
+        
+        .toxicity-percentage {
+            font-size: 1.25rem;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        
+        .meter-bar {
+            height: 12px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+            margin-bottom: 0.75rem;
+        }
+        
+        .meter-progress {
+            height: 100%;
+            width: 0%;
+            transition: width 0.6s ease, background-color 0.6s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .toxicity-levels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+        }
+        
+        .level-marker {
+            position: relative;
+            flex: 1;
+            text-align: center;
+            padding-top: 0.75rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .level-marker::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 6px;
+            background-color: var(--text-muted);
+        }
+        
+        .toxicity-details {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .toxicity-tag {
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 1rem 0;
+        }
+        
+        .spinner {
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid var(--primary);
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem 0;
+            color: var(--neutral);
+            font-size: 0.875rem;
+        }
+        
+        @media (max-width: 576px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+            
+            .header-content {
+                padding: 0 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">Toxic<span>Check</span></div>
+            <h1>Comment Classifier</h1>
+        </div>
+        <div class="header-background"></div>
+    </header>
+
+    <style>
+        header {
+            background-color: #121212;
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .header-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(78, 84, 200, 0.8) 0%, rgba(44, 48, 115, 0.9) 100%);
+            z-index: -1;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-right: 1rem;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(78, 84, 200, 0.5);
+        }
+        
+        .logo span {
+            color: var(--danger);
+            text-shadow: 0 0 10px rgba(225, 70, 104, 0.5);
+        }
+    </style>
+
+    <div class="container">
+        <div class="card">
+            <form id="commentForm" method="post" action="{% url 'myapp:classify_comment' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="comment">Enter your comment:</label>
+                    <textarea 
+                        id="comment"
+                        name="comment" 
+                        class="form-control" 
+                        rows="5" 
+                        placeholder="Type or paste a comment to check for toxicity..."
+                        required
+                    ></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Analyze Comment</button>
+            </form>
+            
+            <div class="loading" id="loadingSpinner">
+                <span class="spinner"></span> Analyzing comment...
+            </div>
+        </div>
+        
+        <div class="card result-card" id="resultCard">
+            <div class="result-header">
+                <div class="result-icon">!</div>
+                <div class="result-title">Analysis Result</div>
+            </div>
+            <div class="result-content" id="result">
+                <!-- Results will appear here -->
+            </div>
+            
+            <!-- Enhanced toxicity meter -->
+            <div class="toxicity-meter" id="toxicityMeterContainer" style="display: none;">
+                <div class="meter-header">
+                    <div class="meter-title">Toxicity Assessment</div>
+                    <div class="toxicity-badge" id="toxicityBadge">Safe</div>
+                </div>
+                
+                <div class="meter-label">
+                    <span>Toxicity Level</span>
+                    <span class="toxicity-percentage" id="toxicityPercentage">0%</span>
+                </div>
+                
+                <div class="meter-bar">
+                    <div class="meter-progress" id="toxicityBar"></div>
+                </div>
+                
+                <div class="toxicity-levels">
+                    <div class="level-marker">0%</div>
+                    <div class="level-marker">25%</div>
+                    <div class="level-marker">50%</div>
+                    <div class="level-marker">75%</div>
+                    <div class="level-marker">100%</div>
+                </div>
+                
+                <div class="toxicity-details" id="toxicityDetails">
+                    <!-- Toxicity details will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <p>Toxic Comment Classifier &copy; 2025 | Helping create safer online spaces</p>
+    </footer>
+
+    <script>
+        const form = document.getElementById('commentForm');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultCard = document.getElementById('resultCard');
+        const resultContent = document.getElementById('result');
+        const toxicityBar = document.getElementById('toxicityBar');
+        const toxicityPercentage = document.getElementById('toxicityPercentage');
+        const toxicityBadge = document.getElementById('toxicityBadge');
+        const toxicityDetails = document.getElementById('toxicityDetails');
+        
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            
+            // Show loading
+            loadingSpinner.style.display = 'block';
+            resultCard.classList.remove('visible');
+            
+            // Get form data
+            const formData = new FormData(form);
+            
+            try {
+                // Use exact same fetch configuration as in your original code
+                const response = await fetch("{% url 'myapp:classify_comment' %}", {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                console.log("Received data:", data); // Log the data for debugging
+                
+                // Hide loading
+                loadingSpinner.style.display = 'none';
+                
+                // Process result
+                processResult(data);
+                
+                // Show result card
+                resultCard.classList.add('visible');
+            } catch (error) {
+                loadingSpinner.style.display = 'none';
+                resultContent.innerHTML = '<p>An error occurred while analyzing the comment. Please try again.</p>';
+                resultCard.classList.add('visible');
+                console.error('Error:', error);
+            }
+        };
+        
+        function processResult(data) {
+            // Get the toxicity meter container
+            const toxicityMeterContainer = document.getElementById('toxicityMeterContainer');
+            
+            // Always display the exact result string from the backend
+            let resultHtml = `<p><strong>${data.result}</strong></p>`;
+            
+            // Set color based on result containing "toxic" word
+            let isToxic = data.result.toLowerCase().includes('toxic');
+            
+            if (isToxic) {
+                resultHtml += `<p>The comment may contain harmful content that could be offensive or inappropriate.</p>`;
+            } else {
+                resultHtml += `<p>The comment appears to be appropriate and non-harmful.</p>`;
+            }
+            
+            // Set the result text
+            resultContent.innerHTML = resultHtml;
+            
+            // Only show and update the toxicity meter if score is provided
+            if (data.score !== undefined) {
+                const percentage = Math.round(data.score * 100);
+                updateToxicityMeter(percentage);
+                toxicityMeterContainer.style.display = 'block';
+            } else {
+                // Hide the toxicity meter if no score is available
+                toxicityMeterContainer.style.display = 'none';
+            }
+        }
+        
+        function updateToxicityMeter(percentage) {
+            // Update percentage display
+            toxicityPercentage.textContent = `${percentage}%`;
+            
+            // Update progress bar width
+            toxicityBar.style.width = `${percentage}%`;
+            
+            // Definitions for different toxicity levels
+            let badgeText, badgeColor, textColor, barColor;
+            let detailsHtml = '';
+            
+            // Set appropriate colors and text based on toxicity percentage
+            if (percentage < 20) {
+                badgeText = 'Safe';
+                badgeColor = 'var(--low-toxic)';
+                textColor = 'var(--low-toxic)';
+                barColor = 'var(--low-toxic)';
+                detailsHtml = `<div class="toxicity-tag">Low risk content</div>`;
+            } else if (percentage < 40) {
+                badgeText = 'Low';
+                badgeColor = 'var(--mild-toxic)';
+                textColor = 'var(--mild-toxic)';
+                barColor = 'var(--mild-toxic)';
+                detailsHtml = `<div class="toxicity-tag">Minor concerns</div>`;
+            } else if (percentage < 60) {
+                badgeText = 'Moderate';
+                badgeColor = 'var(--medium-toxic)';
+                textColor = 'var(--medium-toxic)';
+                barColor = 'var(--medium-toxic)';
+                detailsHtml = `<div class="toxicity-tag">Potential issues</div>`;
+            } else if (percentage < 80) {
+                badgeText = 'High';
+                badgeColor = 'var(--high-toxic)';
+                textColor = 'var(--high-toxic)';
+                barColor = 'var(--high-toxic)';
+                detailsHtml = `<div class="toxicity-tag">Concerning content</div>`;
+            } else {
+                badgeText = 'Extreme';
+                badgeColor = 'var(--extreme-toxic)';
+                textColor = 'var(--extreme-toxic)';
+                barColor = 'var(--extreme-toxic)';
+                detailsHtml = `<div class="toxicity-tag">Highly toxic</div>`;
+            }
+            
+            // Apply styles to elements
+            toxicityBadge.textContent = badgeText;
+            toxicityBadge.style.backgroundColor = badgeColor;
+            toxicityPercentage.style.color = textColor;
+            toxicityBar.style.backgroundColor = barColor;
+            
+            // Add gradient effect to the progress bar for better visual appearance
+            if (percentage < 50) {
+                toxicityBar.style.backgroundImage = `linear-gradient(90deg, var(--low-toxic), ${barColor})`;
+            } else {
+                toxicityBar.style.backgroundImage = `linear-gradient(90deg, var(--medium-toxic), ${barColor})`;
+            }
+            
+            // Update details section
+            toxicityDetails.innerHTML = detailsHtml;
+        }
+    </script>
+</body>
+</html>

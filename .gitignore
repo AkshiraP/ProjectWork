@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Virtual env
+venv/
+env/
+*.env
+
+# Django
+db.sqlite3
+/staticfiles/
+media/
+
+# Model files (handled via Google Drive, not GitHub)
+*.h5
+*.pkl
